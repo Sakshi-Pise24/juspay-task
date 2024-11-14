@@ -1,137 +1,54 @@
-// import React, { useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
-// const CANVAS_WIDTH = 480;
-// const CANVAS_HEIGHT = 360;
-
-// const Stage = ({ sprites, onReset, onDragStart }) => {
-//   const canvasRef = useRef(null);
-//   const contextRef = useRef(null);
-
-//   useEffect(() => {
-//     const canvas = canvasRef.current;
-//     const context = canvas.getContext('2d');
-//     contextRef.current = context;
-//     drawGrid();
-//   }, []);
-
-//   useEffect(() => {
-//     if (!contextRef.current) return;
-//     drawGrid();
-//     sprites.forEach(sprite => {
-//       if (sprite.isVisible) {
-//         drawSprite(sprite);
-//       }
-//     });
-//   }, [sprites]);
-
-//   const drawGrid = () => {
-//     const context = contextRef.current;
-//     context.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-//     // Draw grid and axes
-//     context.strokeStyle = '#ddd';
-//     context.lineWidth = 1;
-//     for (let x = 0; x <= CANVAS_WIDTH; x += 40) {
-//       context.beginPath();
-//       context.moveTo(x, 0);
-//       context.lineTo(x, CANVAS_HEIGHT);
-//       context.stroke();
-//     }
-//     for (let y = 0; y <= CANVAS_HEIGHT; y += 40) {
-//       context.beginPath();
-//       context.moveTo(0, y);
-//       context.lineTo(CANVAS_WIDTH, y);
-//       context.stroke();
-//     }
-
-//     // Draw axes
-//     context.strokeStyle = '#999';
-//     context.lineWidth = 2;
-//     context.beginPath();
-//     context.moveTo(CANVAS_WIDTH / 2, 0);
-//     context.lineTo(CANVAS_WIDTH / 2, CANVAS_HEIGHT);
-//     context.moveTo(0, CANVAS_HEIGHT / 2);
-//     context.lineTo(CANVAS_WIDTH, CANVAS_HEIGHT / 2);
-//     context.stroke();
-//   };
-
-//   const drawSprite = (sprite) => {
-//     const context = contextRef.current;
-//     const img = new Image();
-//     img.src = sprite.image;
-//     img.onload = () => {
-//       context.save();
-//       context.translate(sprite.x + sprite.size / 2, sprite.y + sprite.size / 2);
-//       context.rotate(sprite.rotation * (Math.PI / 180));
-//       context.drawImage(img, -sprite.size / 2, -sprite.size / 2, sprite.size, sprite.size);
-//       context.restore();
-//     };
-//   };
-
-//   return (
-//     <div className="relative">
-//       <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} className="border" />
-//     </div>
-//   );
-// };
-
-// export default Stage;
-import React, { useState, useRef, useCallback } from 'react';
-
-const Stage = ({ sprites, onDragStart }) => {
+export default function Component({ 
+  sprites, 
+  onUpdateSprite, 
+  width, 
+  height, 
+  onSpriteSelect, 
+  selectedSpriteId 
+}) {
   const [draggingSprite, setDraggingSprite] = useState(null);
   const stageRef = useRef(null);
 
-  // Function to calculate the mouse position relative to the stage
-  const getMousePos = (e) => {
-    const rect = stageRef.current.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (draggingSprite) {
+        const stageRect = stageRef.current.getBoundingClientRect();
+        let newX = e.clientX - stageRect.left - draggingSprite.offsetX;
+        let newY = e.clientY - stageRect.top - draggingSprite.offsetY;
+
+        newX = Math.max(0, Math.min(newX, width - draggingSprite.width));
+        newY = Math.max(0, Math.min(newY, height - draggingSprite.height));
+
+        onUpdateSprite(draggingSprite.id, { x: newX, y: newY });
+      }
     };
-  };
 
-  // Handle mouse down: start dragging the sprite
+    const handleMouseUp = () => {
+      setDraggingSprite(null);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [draggingSprite, onUpdateSprite, width, height]);
+
   const handleMouseDown = (e, sprite) => {
-    const mousePos = getMousePos(e);
+    e.stopPropagation();
+    const stageRect = stageRef.current.getBoundingClientRect();
     setDraggingSprite({
-      ...sprite,
-      initialMousePos: mousePos,
-      initialSpritePos: { x: sprite.x, y: sprite.y },
+      id: sprite.id,
+      offsetX: e.clientX - stageRect.left - sprite.x,
+      offsetY: e.clientY - stageRect.top - sprite.y,
+      width: sprite.size,
+      height: sprite.size,
     });
-  };
-
-  // Handle mouse move: move the sprite based on mouse position
-  const handleMouseMove = useCallback(
-    (e) => {
-      if (!draggingSprite) return;
-
-      const mousePos = getMousePos(e);
-
-      // Calculate how much the mouse has moved since drag started
-      const dx = mousePos.x - draggingSprite.initialMousePos.x;
-      const dy = mousePos.y - draggingSprite.initialMousePos.y;
-
-      // Update the sprite's position
-      const updatedSprite = {
-        ...draggingSprite,
-        x: draggingSprite.initialSpritePos.x + dx,
-        y: draggingSprite.initialSpritePos.y + dy,
-      };
-
-      // Call the parent component to update sprite position
-      onDragStart(updatedSprite);
-    },
-    [draggingSprite, onDragStart]
-  );
-
-  // Stop dragging when the mouse is released or leaves the area
-  const handleMouseUp = () => {
-    setDraggingSprite(null); // Stop dragging
-  };
-
-  const handleMouseLeave = () => {
-    setDraggingSprite(null); // Stop dragging if the mouse leaves the stage area
+    onSpriteSelect(sprite.id);
   };
 
   return (
@@ -139,32 +56,18 @@ const Stage = ({ sprites, onDragStart }) => {
       ref={stageRef}
       className="relative"
       style={{
-        width: '480px',
-        height: '360px',
+        width: `${width}px`,
+        height: `${height}px`,
         border: '1px solid #000',
         backgroundColor: '#f0f0f0',
       }}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
     >
-      {/* Grid or background */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          pointerEvents: 'none',
-          background: 'url(grid-background.png) repeat', // Optional grid background
-        }}
-      />
-      
-      {sprites.map((sprite, index) => (
+      {sprites.map((sprite) => (
         <div
-          key={index}
-          className="sprite"
+          key={sprite.id}
+          className={`sprite ${selectedSpriteId === sprite.id ? 'ring-2 ring-blue-500' : ''} ${
+            sprite.collided ? 'animate-pulse' : ''
+          }`}
           style={{
             position: 'absolute',
             top: `${sprite.y}px`,
@@ -173,14 +76,13 @@ const Stage = ({ sprites, onDragStart }) => {
             height: `${sprite.size}px`,
             backgroundImage: `url(${sprite.image})`,
             backgroundSize: 'cover',
-            cursor: 'pointer',
-            zIndex: draggingSprite?.id === sprite.id ? 10 : 1, // Bring dragged sprite to front
+            cursor: 'move',
+            display: sprite.isVisible ? 'block' : 'none',
+            transform: `scaleX(${sprite.rotation === 180 ? -1 : 1}) rotate(${sprite.rotation}deg)`,
           }}
           onMouseDown={(e) => handleMouseDown(e, sprite)}
         />
       ))}
     </div>
   );
-};
-
-export default Stage;
+}
