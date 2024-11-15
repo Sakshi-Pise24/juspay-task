@@ -1,10 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import BlockPalette from './components/BlockPalette/BlockPalette';
 import Workspace from './components/Workspace/Workspace';
 import Stage from './components/Stage/Stage';
 import SpriteManager from './components/Sprites/SpriteManager';
 import { runProgram, detectCollision } from './utils/blockExecutor';
-import { Trash2 } from 'lucide-react';
+// import { Trash2 } from 'lucide-react';
 
 export default function Component() {
   const [activeCategory, setActiveCategory] = useState('motion');
@@ -18,20 +18,7 @@ export default function Component() {
   const STAGE_WIDTH = 480;
   const STAGE_HEIGHT = 360;
 
-  useEffect(() => {
-    if (isRunning) {
-      const collisionInterval = setInterval(() => {
-        const collidedSprites = detectCollision(sprites);
-        if (collidedSprites.length === 2) {
-          handleCollision(collidedSprites[0], collidedSprites[1]);
-        }
-      }, 100);
-
-      return () => clearInterval(collisionInterval);
-    }
-  }, [isRunning, sprites]);
-
-  const handleCollision = (sprite1, sprite2) => {
+  const handleCollision = useCallback((sprite1, sprite2) => {
     // Swap positions
     const tempX = sprite1.x;
     const tempY = sprite1.y;
@@ -70,7 +57,20 @@ export default function Component() {
         return sprite;
       }));
     }, 500);
-  };
+  }, [workspaces, setWorkspaces, setSprites]);
+
+  useEffect(() => {
+    if (isRunning) {
+      const collisionInterval = setInterval(() => {
+        const collidedSprites = detectCollision(sprites);
+        if (collidedSprites.length === 2) {
+          handleCollision(collidedSprites[0], collidedSprites[1]);
+        }
+      }, 100);
+
+      return () => clearInterval(collisionInterval);
+    }
+  }, [isRunning, sprites, handleCollision]);
 
   const handleAddSprite = (spriteType) => {
     const newSprite = {
